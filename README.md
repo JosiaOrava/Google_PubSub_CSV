@@ -13,9 +13,9 @@ Example of the output:
 
 ## Configuration
 Copy `conf.py-TEMPLATE` and rename it to `conf.py`. In that file you will need to insert the following information to variables:
-* PROJECT_ID = project ID of the google cloud project  
-* SUBSCRIPTION_ID = subscription ID for the topic messages are sent 
-* PRIVATE_KEY_FILE = name of the service account key json file
+* *PROJECT_ID* = project ID of the google cloud project  
+* *SUBSCRIPTION_ID* = subscription ID for the topic messages are sent 
+* *PRIVATE_KEY_FILE* = name of the service account key json file
 
 To get service account keyfile you will need to go to Google Cloud -> Service Accounts -> Select service account that has rights to Pub/Sub subscription -> Keys -> Add key
 
@@ -23,8 +23,8 @@ That will download a json file that contains your private information. `WARNING:
 
 ## Dependencies
 You need the following python packets:
-* google-cloud-pubsub
-* google-cloud-core
+* `google-cloud-pubsub`
+* `google-cloud-core`
 
 You can install them by running 'pip install google-cloud-pubsub google-cloud-core'
 
