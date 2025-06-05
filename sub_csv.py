@@ -6,13 +6,18 @@ from datetime import datetime, timezone
 from google.cloud import pubsub_v1
 from google.protobuf.timestamp_pb2 import Timestamp as ProtoTimestamp
 from google.api_core.datetime_helpers import DatetimeWithNanoseconds
+from conf import *
 
 # Conf
 OUTPUT_DIR = "pubsub_daily_data"  
 MAX_MESSAGES_TO_PULL = 10 
-PULL_TIMEOUT_SECONDS = 30.0 
+PULL_TIMEOUT_SECONDS = 30.0
 
-# Header
+curr_dir = os.path.dirname(os.path.abspath(__file__))
+credentials_path = os.path.join(curr_dir, "private.json")
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
+print(f"GOOGLE_APPLICATION_CREDENTIALS set to: {os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')}")
+
 # Common header for all rows in the daily CSV files
 CSV_HEADER = [
     'Device ID',
@@ -24,10 +29,16 @@ CSV_HEADER = [
     'Electrical Conductivity' 
 ]
 
+# Error check for credentials
+if not os.path.exists(credentials_path):
+    print(f"ERROR: Credentials file not found at location: {credentials_path}")
+    print("Make sure you have downloaded service account keyfile, renamed to 'private.json' and placed it in current directory")
+    exit(1)
+else:
+    print("Credentials file found")
 
-def is_mac_address(key_string):
-    """Rudimentary check if a string looks like a MAC address."""
-    return bool(re.match(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", key_string))
+def is_mac_address(string):
+    return bool(re.match(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$", string))
 
 def process_messages():
     subscriber_client = pubsub_v1.SubscriberClient()
@@ -54,12 +65,11 @@ def process_messages():
                 continue
 
             ack_ids = []
-            # Fallback time if message's own timestamp is problematic
+            # Fallback time if message's own timestamp fails
             current_processing_time_utc = datetime.now(timezone.utc)
 
             for received_message in response.received_messages:
                 message_id = received_message.message.message_id
-                
                 
                 raw_publish_time = received_message.message.publish_time
                 msg_datetime_utc = None 
@@ -67,35 +77,31 @@ def process_messages():
                 if isinstance(raw_publish_time, ProtoTimestamp):
                     
                     if raw_publish_time.seconds == 0 and raw_publish_time.nanos == 0:
-                        print(f"Warning: Message {message_id} has a default/unset Protobuf Timestamp for publish_time.")
+                        print(f"Warning: Message {message_id} has a default/unset Protobuf Timestamp for publish_time")
                         
                     else:
                         try:
                             msg_datetime_utc = ProtoTimestamp.ToDatetime(raw_publish_time)
                         except Exception as e:
-                            print(f"Error converting Protobuf Timestamp to datetime for message {message_id}: {e}")
+                            print(f"ERROR: converting Protobuf Timestamp to datetime for message {message_id}: {e}")
                             
                 elif isinstance(raw_publish_time, (datetime, DatetimeWithNanoseconds)):
                     
                     msg_datetime_utc = raw_publish_time
                 
-                
                 if not msg_datetime_utc:
-                    print(f"Warning: Message {message_id} using fallback time. Publish_time was '{raw_publish_time}' (type: {type(raw_publish_time)}).")
+                    print(f"Warning: Message {message_id} using fallback time. Publish_time was '{raw_publish_time}' (type: {type(raw_publish_time)})")
                     msg_datetime_utc = current_processing_time_utc
-                
                 
                 msg_date_str = msg_datetime_utc.strftime('%Y-%m-%d')
                 publish_datetime_iso = msg_datetime_utc.isoformat() 
-
-                
                 
                 try:
                     message_data_str = received_message.message.data.decode('utf-8')
                     data = json.loads(message_data_str)
 
                     if not data or not isinstance(data, dict) or len(data) != 1:
-                        print(f"Skipping message {message_id}: Unexpected JSON structure.")
+                        print(f"Skipping message {message_id}: Unexpected data in JSON structure")
                         ack_ids.append(received_message.ack_id)
                         continue
 
@@ -118,8 +124,11 @@ def process_messages():
                     base_row_data = {
                         'Device ID': device_key_original,
                         'Sensor Type': '',
-                        'Temperature': '', 'Humidity': '', 'Pressure': '',
-                        'Volumetric Water Content': '', 'Electrical Conductivity': ''
+                        'Temperature': '',
+                        'Humidity': '',
+                        'Pressure': '',
+                        'Volumetric Water Content': '',
+                        'Electrical Conductivity': ''
                     }
 
                     if is_mac_address(device_key_original):
@@ -128,33 +137,33 @@ def process_messages():
                         humidities = device_data.get('humidity', [])
                         pressures = device_data.get('pressure', [])
                         num_readings = len(temperatures)
-                        if not (len(humidities) == num_readings and len(pressures) == num_readings):
-                            print(f"Warning: Mismatched array lengths for MAC {device_key_original} in msg {message_id}.")
-                        else:
-                            for i in range(num_readings):
-                                row = base_row_data.copy()
-                                row['Temperature'] = temperatures[i] if i < len(temperatures) else ''
-                                row['Humidity'] = humidities[i] if i < len(humidities) else ''
-                                row['Pressure'] = pressures[i] if i < len(pressures) else ''
-                                writer.writerow([row[col] for col in CSV_HEADER])
+        
+                        for i in range(num_readings):
+                            row = base_row_data.copy()
+                            row['Temperature'] = temperatures[i] if i < len(temperatures) else ''
+                            row['Humidity'] = humidities[i] if i < len(humidities) else ''
+                            row['Pressure'] = pressures[i] if i < len(pressures) else ''
+                            writer.writerow([row[col] for col in CSV_HEADER])
+
                     elif device_key_original == "TEROS12":
                         base_row_data['Sensor Type'] = "TEROS 12"
                         vwc_values = device_data.get('volumetric_water_content', [])
                         temp_values = device_data.get('temperature', [])
                         ec_values = device_data.get('electrical_conductivity', [])
                         num_readings = len(vwc_values)
-                        if not (len(temp_values) == num_readings and len(ec_values) == num_readings):
-                             print(f"Warning: Mismatched array lengths for TEROS12 in msg {message_id}.")
-                        else:
-                            for i in range(num_readings):
-                                row = base_row_data.copy()
-                                row['Temperature'] = temp_values[i] if i < len(temp_values) else ''
-                                row['Volumetric Water Content'] = vwc_values[i] if i < len(vwc_values) else ''
-                                row['Electrical Conductivity'] = ec_values[i] if i < len(ec_values) else ''
-                                writer.writerow([row[col] for col in CSV_HEADER])
+                        
+                        for i in range(num_readings):
+                            row = base_row_data.copy()
+                            row['Temperature'] = temp_values[i] if i < len(temp_values) else ''
+                            row['Volumetric Water Content'] = vwc_values[i] if i < len(vwc_values) else ''
+                            row['Electrical Conductivity'] = ec_values[i] if i < len(ec_values) else ''
+                            writer.writerow([row[col] for col in CSV_HEADER])
+
                     else:
                         print(f"Skipping message {message_id}: Unknown device key '{device_key_original}'.")
+
                     ack_ids.append(received_message.ack_id)
+
                 except json.JSONDecodeError:
                     print(f"Skipping message {message_id}: Invalid JSON.")
                     ack_ids.append(received_message.ack_id)
@@ -180,13 +189,16 @@ def process_messages():
             print(f"Closed file for date {date_str}")
         if 'subscriber_client' in locals():
             subscriber_client.close()
-            print("Subscriber client closed.")
+            print("Subscriber client closed")
 
 if __name__ == "__main__":
-    if not PROJECT_ID or PROJECT_ID == "your-gcp-project-id":
-        print("Error: Please set your GCP_PROJECT_ID in the script.")
+    if not PROJECT_ID:
+        print("ERROR: Set your GCP_PROJECT_ID in the conf file")
         exit(1)
-    if not SUBSCRIPTION_ID or SUBSCRIPTION_ID == "your-pubsub-subscription-id":
-        print("Error: Please set your SUBSCRIPTION_ID in the script.")
+    if not SUBSCRIPTION_ID:
+        print("ERROR: Set your SUBSCRIPTION_ID in the conf file")
+        exit(1)
+    if not PRIVATE_KEY_FILE:
+        print("ERROR: Set your PRIVATE_KEY_FILE in the conf file")
         exit(1)
     process_messages()

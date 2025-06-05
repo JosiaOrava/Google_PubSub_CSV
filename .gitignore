@@ -3,3 +3,4 @@ pubsub_daily_data/
 ObtainAccessToken.py
 publish.py
 conf.py
+.venv/
