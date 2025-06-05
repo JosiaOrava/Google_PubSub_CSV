@@ -4,7 +4,7 @@ This is a Python script to fetch messages from Google Cloud Pub/Sub and checks f
 Example of output:
 | Device ID        | Sensor Type   | Temperature | Humidity | Pressure | Volumetric Water Content | Electrical Conductivity |
 |------------------|---------------|-------------|----------|----------|--------------------------|-------------------------|
-| TEROS12          | TEROS 12      | 22.3        |          |          | 1817.13                  | 0.0                     |
+| TEROS12          | TEROS 12      | 22.3        |          |          | 1817.13                  | 512.5                     |
 | DD:83:3D:A4:CE:C6 | Ruuvitag      | 21.23       | 44.26    | 1155.35  |                          |                         |
 | DB:C3:58:D9:03:70 | Ruuvitag      | 21.24       | 43.96    | 1155.35  |                          |                         |
 | E2:70:D7:96:45:18 | Ruuvitag      | 21.28       | 42.12    | 1155.35  |                          |                         |
