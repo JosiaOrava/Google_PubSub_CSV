@@ -26,6 +26,6 @@ You need the following python packets:
 * `google-cloud-pubsub`
 * `google-cloud-core`
 
-You can install them by running 'pip install google-cloud-pubsub google-cloud-core'
+You can install them by running `pip install google-cloud-pubsub google-cloud-core`
 
 
