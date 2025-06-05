@@ -8,8 +8,6 @@ from google.protobuf.timestamp_pb2 import Timestamp as ProtoTimestamp
 from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 
 # Conf
-PROJECT_ID = "prj-mtp-jaak-leht-ufl"  
-SUBSCRIPTION_ID = "ymparistomoduuli-sub"  
 OUTPUT_DIR = "pubsub_daily_data"  
 MAX_MESSAGES_TO_PULL = 10 
 PULL_TIMEOUT_SECONDS = 30.0 
